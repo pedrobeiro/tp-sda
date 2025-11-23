@@ -118,6 +118,13 @@ def main():
     opc_client, (tX, tY, tZ, dX, dY, dZ) = connect_opc()
     sim, drone, target = connect_coppelia()
 
+    # senao o drone anda pro ultimo target salvo
+    print("[INIT] Resetando targets para origem (0, 0, 1.5)...")
+    tX.set_value(0.0)
+    tY.set_value(0.0)
+    tZ.set_value(1.5)
+    print("[INIT] Targets resetados!")
+
     try:
         # 2) Inicial: mantenha alvo na altura mínima (decola suave)
         p_drone = get_pos(sim, drone)

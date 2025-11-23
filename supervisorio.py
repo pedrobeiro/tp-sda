@@ -219,17 +219,32 @@ class Supervisorio:
         
         try:
             self.rodando = False
+            
             if self.socket:
-                self.socket.send(b"QUIT\n")
-                time.sleep(0.5)
+                try:
+                    self.socket.send(b"QUIT\n")
+                    time.sleep(0.2)
+                except:
+                    pass
+                
+                try:
+                    self.socket.shutdown(socket.SHUT_RDWR)
+                except:
+                    pass
+                
                 self.socket.close()
+                self.socket = None
+            
+            # Aguardar thread encerrar
+            if self.thread_leitura and self.thread_leitura.is_alive():
+                self.thread_leitura.join(timeout=2.0)
             
             self.conectado = False
             self.label_status.config(text="● DESCONECTADO", fg="red")
             self.btn_conectar.config(state="normal")
             self.btn_desconectar.config(state="disabled")
             
-            self.log("🔌 Desconectado do CLP")
+            self.log("Desconectado do CLP")
             
         except Exception as e:
             self.log(f"Erro ao desconectar: {e}")
@@ -265,6 +280,11 @@ class Supervisorio:
     def thread_ler_status(self):
         """Thread que lê STATUS continuamente do CLP"""
         contador = 0
+        
+        # Configurar timeout no socket
+        if self.socket:
+            self.socket.settimeout(1.0)
+        
         while self.rodando and self.conectado:
             try:
                 # Pedir STATUS
@@ -300,13 +320,17 @@ class Supervisorio:
                         self.log_posicao_drone()
                         contador = 0
                 
-                time.sleep(0.5)  # Atualiza a cada 0.5s
+                time.sleep(0.5)
                 
+            except socket.timeout:
+                # Timeout é normal, continua o loop
+                continue
             except Exception as e:
                 if self.rodando:
-                    self.log(f"Erro na leitura: {e}")
-                    self.conectado = False
+                    print(f"[Thread Leitura] Erro: {e}")
                 break
+        
+        print("[Thread Leitura] Encerrada")
     
     def atualizar_display_drone(self):
         """Atualiza labels de posição do drone"""
@@ -324,12 +348,21 @@ class Supervisorio:
         """Atualiza label de timestamp"""
         self.label_timestamp.config(text=self.ultimo_timestamp)
     
+
     def fechar(self):
         """Fecha o supervisório"""
-        self.log("Encerrando Supervisório...")
+        print("[Supervisório] Fechando...")
         self.rodando = False
         self.desconectar()
-        self.root.destroy()
+        
+        # Aguardar um pouco antes de destruir
+        time.sleep(0.3)
+        
+        try:
+            self.root.quit()
+            self.root.destroy()
+        except:
+            pass
 
 def main():
     root = tk.Tk()

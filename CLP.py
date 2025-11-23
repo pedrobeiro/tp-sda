@@ -121,6 +121,11 @@ class CLP:
             raise RuntimeError("Variáveis não encontradas")
         
         print("[CLP-OPC] Variáveis mapeadas!")
+
+        # Escrever valores iniciais (senao o drone pega o último target salvo)
+        print("[CLP-OPC] Inicializando targets com posição segura (0, 0, 1.5)...")
+        self.enviar_target(0.0, 0.0, 1.5)
+        print("[CLP-OPC] Targets inicializados!")
     
     def ler_posicao_drone(self):
         """Lê posição atual do drone do Prosys"""
