@@ -331,9 +331,6 @@ class Supervisorio:
         self.desconectar()
         self.root.destroy()
 
-############################
-# MAIN
-############################
 def main():
     root = tk.Tk()
     app = Supervisorio(root)
