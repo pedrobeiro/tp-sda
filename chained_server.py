@@ -1,37 +1,15 @@
-# chained_server.py
-#
-# Cliente OPC UA do SimulationServer (Prosys) + Servidor OPC UA "encadeado"
-# Lê DroneX/DroneY/DroneZ (e TargetX/Y/Z) do SimulationServer
-# e publica essas mesmas variáveis em um novo servidor OPC UA,
-# para que o MES possa ler.
-
 import time
 from opcua import Client, Server
 
-############################
-# CONFIGURAÇÕES
-############################
-
-# Servidor OPC UA original (SimulationServer / Prosys)
 UPSTREAM_URL = "opc.tcp://localhost:53530/OPCUA/SimulationServer"
-
-# Nosso servidor OPC UA "encadeado"
 CHAINED_ENDPOINT = "opc.tcp://0.0.0.0:54000/OPCUA/ChainedServer"
-
-# Namespace do nosso servidor
 NAMESPACE_URI = "http://ufmg.br/drone/ChainedServer"
-
-# Período de atualização (segundos)
 DT = 0.2  # 5 Hz
 
-############################
-# FUNÇÕES AUXILIARES OPC UA CLIENT
-############################
 
 def connect_upstream(url=UPSTREAM_URL):
     """
-    Conecta ao servidor OPC UA original (SimulationServer)
-    e retorna o Client e os nós das variáveis necessárias.
+    Conecta ao servidor upstream e retorna client e nós das variáveis.
     """
     print(f"[CHAINED-CLIENT] Conectando ao servidor upstream: {url}")
     client = Client(url)
@@ -40,7 +18,6 @@ def connect_upstream(url=UPSTREAM_URL):
 
     root = client.get_objects_node()
 
-    # Achar pasta "Drone" (igual à lógica de bridge.py/CLP.py)
     drone_folder = None
     try:
         drone_folder = root.get_child(["3:Drone"])
@@ -56,7 +33,6 @@ def connect_upstream(url=UPSTREAM_URL):
     if drone_folder is None:
         raise RuntimeError("Pasta 'Drone' não encontrada no servidor upstream")
 
-    # Mapear variáveis por nome (case-insensitive)
     name_to_node = {}
     for var in drone_folder.get_children():
         try:
@@ -65,7 +41,6 @@ def connect_upstream(url=UPSTREAM_URL):
         except Exception:
             pass
 
-    # Variáveis que queremos espelhar
     tX = name_to_node.get("targetx")
     tY = name_to_node.get("targety")
     tZ = name_to_node.get("targetz")
@@ -84,30 +59,19 @@ def connect_upstream(url=UPSTREAM_URL):
     print("[CHAINED-CLIENT] Variáveis mapeadas no upstream")
     return client, (tX, tY, tZ, dX, dY, dZ)
 
-############################
-# FUNÇÕES AUXILIARES OPC UA SERVER
-############################
 
 def start_chained_server():
     """
-    Cria e inicia o servidor OPC UA encadeado,
-    com um objeto 'Drone' contendo as variáveis:
-    DroneX, DroneY, DroneZ, TargetX, TargetY, TargetZ.
+    Inicia o servidor encadeado com objeto Drone e variáveis locais.
     """
     server = Server()
     server.set_endpoint(CHAINED_ENDPOINT)
     server.set_server_name("ChainedDroneServer")
 
-    # Registrar namespace
     idx = server.register_namespace(NAMESPACE_URI)
-
-    # Nó raiz Objects
     objects = server.get_objects_node()
-
-    # Criar objeto Drone
     drone_obj = objects.add_object(idx, "Drone")
 
-    # Adicionar variáveis (inicializadas com 0.0)
     var_drone_x = drone_obj.add_variable(idx, "DroneX", 0.0)
     var_drone_y = drone_obj.add_variable(idx, "DroneY", 0.0)
     var_drone_z = drone_obj.add_variable(idx, "DroneZ", 0.0)
@@ -116,16 +80,6 @@ def start_chained_server():
     var_target_y = drone_obj.add_variable(idx, "TargetY", 0.0)
     var_target_z = drone_obj.add_variable(idx, "TargetZ", 1.5)
 
-    # (Opcional) Tornar variáveis graváveis pelo cliente MES, caso você queira
-    # que o MES também escreva algo de volta. Não é necessário para o enunciado.
-    # var_drone_x.set_writable()
-    # var_drone_y.set_writable()
-    # var_drone_z.set_writable()
-    # var_target_x.set_writable()
-    # var_target_y.set_writable()
-    # var_target_z.set_writable()
-
-    # Iniciar servidor
     server.start()
     print(f"[CHAINED-SERVER] Servidor OPC UA encadeado iniciado em {CHAINED_ENDPOINT}")
 
@@ -138,22 +92,18 @@ def start_chained_server():
         "TargetZ": var_target_z,
     }
 
-############################
-# MAIN
-############################
 
 def main():
-    # 1) Conectar ao servidor upstream (SimulationServer/Prosys)
+    """
+    Espelha variáveis do upstream para o servidor encadeado em loop.
+    """
     upstream_client, (tX, tY, tZ, dX, dY, dZ) = connect_upstream()
-
-    # 2) Iniciar nosso servidor OPC UA encadeado
     chained_server, local_vars = start_chained_server()
 
     print("[CHAINED] Iniciando loop de espelhamento (Ctrl+C para sair)")
 
     try:
         while True:
-            # Ler do upstream
             try:
                 drone_x = float(dX.get_value())
                 drone_y = float(dY.get_value())
@@ -166,7 +116,6 @@ def main():
                 time.sleep(DT)
                 continue
 
-            # Atualizar nossas variáveis locais (servidor encadeado)
             try:
                 local_vars["DroneX"].set_value(drone_x)
                 local_vars["DroneY"].set_value(drone_y)
@@ -176,10 +125,6 @@ def main():
                 local_vars["TargetZ"].set_value(target_z)
             except Exception as e:
                 print(f"[CHAINED-SERVER] Erro ao escrever nas variáveis locais: {e}")
-
-            # Debug opcional
-            # print(f"[CHAINED] DRONE=({drone_x:.3f}, {drone_y:.3f}, {drone_z:.3f}) "
-            #       f"TARGET=({target_x:.3f}, {target_y:.3f}, {target_z:.3f})")
 
             time.sleep(DT)
 
@@ -197,6 +142,7 @@ def main():
             pass
 
         print("[CHAINED] Finalizado com sucesso.")
+
 
 if __name__ == "__main__":
     main()
