@@ -1,18 +1,13 @@
 # mes.py
-#
-# Cliente OPC UA que se conecta ao servidor encadeado (chained_server.py),
-# lê as variáveis do drone e salva em um arquivo mes.txt com timestamp.
-
-import time
 from datetime import datetime
 from opcua import Client
+import time
 
 CHAINED_ENDPOINT = "opc.tcp://localhost:54000/OPCUA/ChainedServer"
 
 def connect_chained_server(url=CHAINED_ENDPOINT):
     """
-    Conecta ao servidor OPC UA encadeado (chained_server.py)
-    e retorna o client e os nós das variáveis necessárias.
+    Conecta ao servidor encadeado e retorna o client e os nós das variáveis.
     """
     print(f"[MES] Conectando ao servidor encadeado: {url}")
     client = Client(url)
@@ -21,15 +16,13 @@ def connect_chained_server(url=CHAINED_ENDPOINT):
 
     root = client.get_objects_node()
 
-    # Procurar objeto "Drone" entre os filhos de Objects
     drone_folder = None
     for node in root.get_children():
         try:
-            name = node.get_browse_name().Name
-            if name.lower() == "drone":
+            if node.get_browse_name().Name.lower() == "drone":
                 drone_folder = node
                 break
-        except Exception:
+        except:
             pass
 
     if drone_folder is None:
@@ -40,7 +33,7 @@ def connect_chained_server(url=CHAINED_ENDPOINT):
         try:
             nm = var.get_browse_name().Name
             name_to_node[nm.lower()] = var
-        except Exception:
+        except:
             pass
 
     dX = name_to_node.get("dronex")
@@ -53,18 +46,20 @@ def connect_chained_server(url=CHAINED_ENDPOINT):
     if not all([dX, dY, dZ, tX, tY, tZ]):
         found = ", ".join(sorted(name_to_node.keys()))
         raise RuntimeError(
-            "Variáveis esperadas não encontradas no servidor encadeado. "
-            "Espero DroneX, DroneY, DroneZ, TargetX, TargetY, TargetZ. "
-            f"Encontradas: {found}"
+            "Variáveis esperadas não encontradas: "
+            f"DroneX, DroneY, DroneZ, TargetX, TargetY, TargetZ. Encontradas: {found}"
         )
 
     print("[MES] Variáveis mapeadas com sucesso")
     return client, (dX, dY, dZ, tX, tY, tZ)
 
-def main():
-    client, (dX, dY, dZ, tX, tY, tZ) = connect_chained_server()
 
-    print("[MES] Iniciando leitura periódica e gravação em mes.txt (Ctrl+C para sair)")
+def main():
+    """
+    Lê drone/target periodicamente do servidor e salva em mes.txt.
+    """
+    client, (dX, dY, dZ, tX, tY, tZ) = connect_chained_server()
+    print("[MES] Iniciando leitura periódica (Ctrl+C para sair)")
 
     try:
         while True:
@@ -76,8 +71,8 @@ def main():
                 target_y = float(tY.get_value())
                 target_z = float(tZ.get_value())
             except Exception as e:
-                print(f"[MES] Erro ao ler do servidor encadeado: {e}")
-                time.sleep(1.0)
+                print(f"[MES] Erro ao ler do servidor: {e}")
+                time.sleep(1)
                 continue
 
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
@@ -88,17 +83,14 @@ def main():
                 f"TARGET_X={target_x:.3f}; TARGET_Y={target_y:.3f}; TARGET_Z={target_z:.3f}\n"
             )
 
-            # Gravar em mes.txt
             try:
                 with open("mes.txt", "a", encoding="utf-8") as f:
                     f.write(linha)
             except Exception as e:
                 print(f"[MES] Erro ao escrever em mes.txt: {e}")
 
-            # Debug opcional no console
             print("[MES]", linha.strip())
-
-            time.sleep(1.0)  # período de amostragem do MES
+            time.sleep(1)
 
     except KeyboardInterrupt:
         print("\n[MES] Encerrando...")
@@ -106,9 +98,10 @@ def main():
     finally:
         try:
             client.disconnect()
-        except Exception:
+        except:
             pass
         print("[MES] Finalizado com sucesso.")
+
 
 if __name__ == "__main__":
     main()
