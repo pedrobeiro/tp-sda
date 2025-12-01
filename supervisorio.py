@@ -32,10 +32,10 @@ class Supervisorio:
         
         # Pontos de inspeção
         self.pontos_inspecao = [
-            ("Bandeja 1 (1, 1)", 1.0, 1.0, 1.5),
-            ("Bandeja 2 (-1, -1)", -1.0, -1.0, 1.5),
-            ("Bandeja 3 (2, -2)", 2.0, -2.0, 1.5),
-            ("Bandeja 4 (-2, 2)", -2.0, 2.0, 1.5)
+            ("Bandeja 1 (2.0, 0.0)", 2.0, 0.0, 1.5),
+            ("Bandeja 2 (0, -2.0)", 0, -2.0, 1.5),
+            ("Bandeja 3 (-2.0, 0.0)", -2.0, 0.0, 1.5),
+            ("Bandeja 4 (0.0, 2.0)", 0.0, 2.0, 1.5)
         ]
         
         self.criar_interface()
