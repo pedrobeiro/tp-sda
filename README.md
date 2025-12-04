@@ -1,126 +1,105 @@
-# Sistema de Controle do Drone – Instruções de Execução
+# README – Sistema Distribuído de Controle de Drone
 
-Este sistema utiliza **cinco programas** que trabalham simultaneamente para controlar um drone simulado no CoppeliaSim usando OPC UA, um supervisório TCP/IP e uma arquitetura em *chained server* para integração com um sistema MES.
+Este repositório contém o trabalho prático da disciplina de Sistemas Distribuídos para Automação (SDA), cujo objetivo é implementar a integração entre um drone simulado no CoppeliaSim, um servidor OPC UA (Prosys), um CLP virtual, um supervisório e uma arquitetura *chained server* para alimentação de um sistema MES.
 
-Antes de começar, **certifique-se de que**:
-
-1. **CoppeliaSim** está aberto com o arquivo `drone.ttt` carregado.  
-2. **Prosys OPC UA Simulation Server** está em execução, com o objeto `Drone` contendo as variáveis:  
-   - `DroneX`, `DroneY`, `DroneZ`  
-   - `TargetX`, `TargetY`, `TargetZ`
 
 ---
 
-## 🚀 Como Executar o Sistema
+# Estrutura do Projeto
 
-Abra **cinco terminais** (ou cinco abas) e execute um script em cada um conforme instruções abaixo.
+Toda a implementação principal está localizada na pasta **tp**.  
+Dentro dela encontram-se:
+
+- `bridge.py`
+- `CLP.py`
+- `supervisorio.py`
+- `chained_server.py`
+- `mes.py`
+- `run.sh` (script de execução automática)
+
+## Execução completa (via script)
+
+Antes de executar, certifique-se de:
+
+1. Abrir o **CoppeliaSim** com a cena `drone.ttt`.
+2. Iniciar o **Prosys OPC UA Simulation Server**, contendo:
+   - Objeto `Drone`
+   - Variáveis `DroneX`, `DroneY`, `DroneZ`
+   - Variáveis `TargetX`, `TargetY`, `TargetZ`
+
+Para rodar tudo automaticamente:
+
+```
+./run.sh
+```
+
+
+O script executa todos os módulos necessários.
+
+### Arquivos gerados:
+
+- `historiador.txt` — gerado pelo supervisório  
+- `MES.txt` — gerado pelo módulo MES  
 
 ---
 
-## 🟦 Terminal 1 — Ponte CoppeliaSim ⇄ OPC UA
+# Whack-a-Moze – Minigame baseado na arquitetura distribuída
 
-Execute:
+![Cena do projeto](whack-a-moze/assets/jogo.png)
+
+Além da implementação principal, o repositório contém o **Whack-a-Moze**, um minigame que reutiliza integralmente a infraestrutura distribuída do projeto.
+
+No jogo:
+
+- Personagens (Armandos e Mozellis) aparecem aleatoriamente nas bandejas.
+- O jogador deve mover o drone até a bandeja correta para capturar o personagem.
+- O jogo utiliza:
+  - As variáveis OPC UA do drone
+  - O CLP virtual
+  - O mesmo fluxo de dados Prosys → CLP → Coppelia → supervisório
+
+Para rodar o minigame entre na pasta dele:
 
 ```
-python3 bridge.py
+cd whack-a-moze
 ```
 
-Este módulo faz a ponte entre o CoppeliaSim e o Prosys, lendo a posição real do drone e movendo o alvo suavemente em direção ao comando `Target`.
+e rode o script que inicializará todos os módulos necessários.
+
+```
+./run.sh
+```
+
+O supervisório vai ser aberto e os inimigos começam a aparecer aleatoriamente.
 
 ---
 
-## 🟩 Terminal 2 — CLP (OPC + TCP)
+# Tutorial Completo – Execução Manual (Terminal por Terminal)
 
-Execute:
+Abaixo está o passo a passo caso você deseje executar cada componente individualmente para depuração.
+Os passos são os mesmos tanto para o TP quanto para o jogo.
 
+1. No primeiro terminal, execute:
 ```
-python3 CLP.py
-```
-
-O CLP é responsável por:
-
-- Ler `DroneX/Y/Z` do OPC UA  
-- Enviar `TargetX/Y/Z` ao OPC UA  
-- Servir dados via TCP/IP para o supervisório  
-- Receber comandos `TARGET` e enviar status  
-
----
-
-## 🟧 Terminal 3 — Supervisório (Interface Gráfica)
-
-Execute:
-
-```
-python3 supervisorio.py
+   python3 bridge.py
 ```
 
-O supervisório permite:
-
-- Escolher bandejas para inspeção (envio automático de `TARGET`)  
-- Visualizar posição do drone em tempo real  
-- Exibir timestamp  
-- Registrar histórico em historiador.txt  
-
----
-
-## 🟨 Terminal 4 — Servidor Encadeado OPC UA (Chained Server)
-
-Execute:
-
+2. No segundo terminal, execute:
 ```
-python3 chained_server.py
+   python3 CLP.py
 ```
 
-Este módulo implementa o servidor OPC UA encadeado (chained server), com a seguinte função:
-
-- Atua como cliente OPC UA do Prosys Simulation Server, lendo continuamente:  
-  - `DroneX`, `DroneY`, `DroneZ`  
-  - `TargetX`, `TargetY`, `TargetZ`  
-- Publica essas mesmas variáveis em um novo servidor OPC UA, no endpoint:  
-  - `opc.tcp://localhost:54000/OPCUA/ChainedServer`  
-- Exponde um novo objeto `Drone` com as variáveis espelhadas, para consumo por outros clientes (no caso, o MES).
-
-Em termos práticos, ele faz o “espelhamento” das informações do drone em um segundo servidor OPC UA, sem afetar a lógica já existente do CLP, do supervisório ou da ponte com o CoppeliaSim.
-
----
-
-## 🟥 Terminal 5 — MES (Cliente OPC UA + Registro em mes.txt)
-
-Execute:
-
+3. No terceiro terminal, execute:
 ```
-python3 mes.py
+   python3 supervisorio.py
 ```
 
-O módulo MES é um cliente OPC UA que se conecta ao servidor encadeado (chained_server.py) e realiza:
-
-- Leitura periódica das variáveis:  
-  - `DroneX`, `DroneY`, `DroneZ`  
-  - `TargetX`, `TargetY`, `TargetZ`  
-- Registro das informações em um arquivo chamado mes.txt, incluindo timestamp, no formato texto, por exemplo:
-
+4. No quarto terminal, execute:
 ```
-AAAA-MM-DD HH:MM:SS.mmm; DRONE_X=x_atual; DRONE_Y=y_atual; DRONE_Z=z_atual; TARGET_X=x_desejado; TARGET_Y=y_desejado; TARGET_Z=z_desejado
+   python3 chained_server.py
 ```
 
-Esse arquivo representa o log do sistema MES, armazenando os dados de processo que poderiam ser usados posteriormente para rastreabilidade, análise de produção, indicadores etc.
-
----
-
-## 🔁 Visão Geral da Arquitetura
-
-Resumindo o fluxo de dados:
-
-- CoppeliaSim  
-  ⇄ bridge.py  
-  ⇄ Prosys OPC UA Simulation Server (objeto `Drone`)  
-  ⇄ CLP.py (cliente OPC + servidor TCP)  
-  ⇄ supervisorio.py (cliente TCP com interface gráfica e historiador)
-
-Em paralelo, para o MES:
-
-- Prosys OPC UA Simulation Server  
-  ⇄ chained_server.py (cliente OPC + novo servidor OPC encadeado)  
-  ⇄ mes.py (cliente OPC que grava mes.txt)
-
-Assim, o requisito da arquitetura de chained server é atendido: há um segundo cliente OPC UA encapsulado em outro servidor OPC UA, que fornece as mesmas informações do drone para um cliente MES, responsável por salvar os dados de processo em mes.txt.
+5. No quinto terminal, execute:
+```
+   python3 mes.py
+```
